@@ -1,0 +1,20 @@
+[project]
+name = "fastapi-tutorial-2"
+version = "0.1.0"
+description = "A 4 hour tutorial for FastAPI"
+requires-python = ">=3.13"
+dependencies = [
+  "aiosqlite>=0.21.0",
+  "black>=25.12.0",
+  "fastapi>=0.124.2",
+  "fastapi-logging-middleware>=0.1.2",
+  "imagekitio>=4.2.0",
+  "passlib[bcrypt]>=1.7.4",
+  "python-dotenv>=1.2.1",
+  "python-jose>=3.5.0",
+  "sqlalchemy>=2.0.49",
+  "uvicorn[standard]>=0.38.0",
+]
+
+[project.scripts]
+dev = "app.main:start"
