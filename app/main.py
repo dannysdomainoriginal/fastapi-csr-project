@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from logging_middleware import GoStyleLoggingMiddleware
 from contextlib import asynccontextmanager
 
-from app.routers import blog
+from app.routers import auth, blog
 from app.config.database import create_db_and_tables
 
 
@@ -28,3 +28,4 @@ app.add_middleware(GoStyleLoggingMiddleware)
 #                                 MOUNT ROUTERS                                #
 # ---------------------------------------------------------------------------- #
 app.include_router(prefix="/blog", router=blog.router)
+app.include_router(prefix="/auth", router=auth.router)

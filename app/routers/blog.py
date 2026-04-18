@@ -4,8 +4,9 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Literal
 
-from app.config.database import get_db, Post
+from app.config.database import get_db, Post, User
 from app.schemas import BlogCreate, BlogUpdate, BlogResponse
+from app.dependencies.auth import get_current_user
 
 router = APIRouter(tags=["blog"])
 
@@ -17,9 +18,16 @@ router = APIRouter(tags=["blog"])
 async def get_all_posts(
     limit: Optional[int] = 10,
     skip: Optional[int] = 0,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ) -> list[BlogResponse]:
-    query = select(Post).order_by(Post.created_at.desc()).offset(skip)
+
+    query = (
+        select(Post)
+        .where(Post.author_id == user.id)
+        .order_by(Post.created_at.desc())
+        .offset(skip)
+    )
 
     if limit is not None:
         query = query.limit(limit)
@@ -35,9 +43,11 @@ async def get_all_posts(
 # --------------------------------------------------------- #
 @router.post("/", status_code=201)
 async def create_post(
-    fields: BlogCreate, session: AsyncSession = Depends(get_db)
+    fields: BlogCreate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ) -> BlogResponse:
-    new_post = Post(**fields.model_dump())
+    new_post = Post(**fields.model_dump(), author_id=user.id)
 
     session.add(new_post)
     await session.commit()
@@ -51,10 +61,15 @@ async def create_post(
 # --------------------------------------------------------- #
 @router.get("/{id}")
 async def get_post_by_id(
-    id: UUID, session: AsyncSession = Depends(get_db)
+    id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ) -> BlogResponse:
-    # session.get is the most efficient lookup for a single Primary Key
-    post = await session.get(Post, str(id))
+    result = await session.execute(
+        select(Post).where(Post.id == str(id), Post.author_id == user.id)
+    )
+
+    post = result.scalar_one_or_none()
 
     if not post:
         raise HTTPException(404, "Post not found")
@@ -67,15 +82,22 @@ async def get_post_by_id(
 # --------------------------------------------------------- #
 @router.patch("/{id}")
 async def update_post_by_id(
-    id: UUID, fields: BlogUpdate, session: AsyncSession = Depends(get_db)
+    id: UUID,
+    fields: BlogUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ) -> BlogResponse:
-    post = await session.get(Post, str(id))
+    result = await session.execute(
+        select(Post).where(Post.id == str(id), Post.author_id == user.id)
+    )
+
+    post = result.scalar_one_or_none()
 
     if not post:
         raise HTTPException(404, "Post not found")
 
-    # Update instance attributes directly from the dump
     update_data = fields.model_dump(exclude_unset=True)
+
     for key, value in update_data.items():
         setattr(post, key, value)
 
@@ -90,10 +112,13 @@ async def update_post_by_id(
 # --------------------------------------------------------- #
 @router.delete("/{id}")
 async def delete_post_by_id(
-    id: UUID, session: AsyncSession = Depends(get_db)
+    id: UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
 ) -> Literal["Delete successful"]:
-    # Execute the delete and check rowcount
-    result = await session.execute(delete(Post).where(Post.id == str(id)))
+    result = await session.execute(
+        delete(Post).where(Post.id == str(id), Post.author_id == user.id)
+    )
 
     if result.rowcount == 0:  # type: ignore[attr-defined]
         raise HTTPException(404, "Post not found")
