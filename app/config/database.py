@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, event, func
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, event, func, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -35,6 +35,32 @@ class Post(Base):
     published: Mapped[bool] = mapped_column(Boolean, default=False)
 
     author: Mapped["User"] = relationship(lazy="joined")
+    author_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class Issue(Base):
+    __tablename__ = "issues"
+
+    id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=lambda: str(uuid4())
+    )
+
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+
+    priority: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+
+    author: Mapped["User"] = relationship(lazy="raise")
     author_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
