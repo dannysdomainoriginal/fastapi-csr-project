@@ -7,11 +7,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, relationship
 
+from sqlalchemy.engine.interfaces import DBAPIConnection
+from sqlalchemy.pool.base import _ConnectionRecord
+
 from app.config.security import hash_password, verify_password
 
 DATABASE_URL = "sqlite+aiosqlite:///./app_database.db"
 
 
+# ---------------------------------------------------------------------------- #
+#                                     MODEL                                    #
+# ---------------------------------------------------------------------------- #
 class Base(DeclarativeBase):
     pass
 
@@ -62,7 +68,7 @@ class User(Base):
     # posts: Mapped[list["Post"]] = relationship(
     #     back_populates="author",
     #     cascade="all, delete-orphan",
-    #     # lazy="selectin", not safe for scale
+    #     # lazy="selectin", not safe for scale, prefer barricading with 'raise'
     # )
 
     @property
@@ -80,16 +86,20 @@ class User(Base):
 engine = create_async_engine(DATABASE_URL)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 
+
 # ---------------------------------------------------------------------------- #
 #                          SQLITE CASCADE ENFORCEMENT                          #
 # ---------------------------------------------------------------------------- #
 @event.listens_for(engine.sync_engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
+def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _crecord: _ConnectionRecord):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
 
 
+# ---------------------------------------------------------------------------- #
+#                               UTILITY FUNCTIONS                              #
+# ---------------------------------------------------------------------------- #
 async def create_db_and_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

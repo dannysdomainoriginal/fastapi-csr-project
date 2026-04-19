@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from jose import jwt, JWTError
 from fastapi import HTTPException
 
-dotenv.load_dotenv()
+
 
 
 # ---------------------------------------------------------------------------- #
