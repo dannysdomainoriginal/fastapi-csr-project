@@ -17,7 +17,7 @@ class JWTService:
 
     @classmethod
     def issue_token(
-        cls, user_id: str, expires_delta: timedelta = timedelta(hours=1)
+        cls, user_id: str, expires_delta: timedelta = timedelta(days=7)
     ) -> str:
         payload = {
             "sub": user_id,

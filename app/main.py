@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from logging_middleware import GoStyleLoggingMiddleware
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware
+from logging_middleware import GoStyleLoggingMiddleware as LoggingMiddleware
 
 from app.routers import auth, blog
 from app.config.database import create_db_and_tables
@@ -22,7 +22,7 @@ app = FastAPI(lifespan=lifespan)
 #                             APP LEVEL MIDDLEWARES                            #
 # ---------------------------------------------------------------------------- #
 app.add_middleware(CORSMiddleware)
-app.add_middleware(GoStyleLoggingMiddleware)
+app.add_middleware(LoggingMiddleware)
 
 # ---------------------------------------------------------------------------- #
 #                                 MOUNT ROUTERS                                #

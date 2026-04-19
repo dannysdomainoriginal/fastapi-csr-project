@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, func
+from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, event, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -28,7 +28,7 @@ class Post(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     published: Mapped[bool] = mapped_column(Boolean, default=False)
 
-    author: Mapped["User"] = relationship(back_populates="posts")
+    author: Mapped["User"] = relationship(lazy="joined")
     author_id: Mapped[str] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
@@ -59,9 +59,11 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    posts: Mapped[list["Post"]] = relationship(
-        back_populates="author", cascade="all, delete-orphan"
-    )
+    # posts: Mapped[list["Post"]] = relationship(
+    #     back_populates="author",
+    #     cascade="all, delete-orphan",
+    #     # lazy="selectin", not safe for scale
+    # )
 
     @property
     def password(self) -> None:
@@ -77,6 +79,15 @@ class User(Base):
 
 engine = create_async_engine(DATABASE_URL)
 async_session = async_sessionmaker(engine, expire_on_commit=False)
+
+# ---------------------------------------------------------------------------- #
+#                          SQLITE CASCADE ENFORCEMENT                          #
+# ---------------------------------------------------------------------------- #
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 
 async def create_db_and_tables():

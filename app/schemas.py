@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from typing import TypeVar, Generic, Optional, Literal
 
 
@@ -15,20 +15,9 @@ class BlogCreate(BaseModel):
 
 
 class BlogUpdate(BaseModel):
-    title: Optional[str]
-    content: Optional[str]
-    published: Optional[bool]
-
-
-class BlogResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    title: str
-    content: str
-    published: bool
-    created_at: datetime
-    updated_at: datetime
+    title: Optional[str] = None
+    content: Optional[str] = None
+    published: Optional[bool] = None
 
 
 # ----------------------------------- USER ----------------------------------- #
@@ -38,9 +27,15 @@ class UserCreate(BaseModel):
     password: str
 
 
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+
+
 class LoginUser(BaseModel):
     email: str
-    password: str
+    password: str = Field(..., min_length=8, max_length=72)
 
 
 class TokenResponse(BaseModel):
@@ -57,13 +52,13 @@ class UserResponse(BaseModel):
     updated_at: datetime
 
 
-T = TypeVar("T")
+class BlogResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
-
-# ---------------------------------------------------------------------------- #
-#                                   API LEVEL                                  #
-# ---------------------------------------------------------------------------- #
-class ApiResponse(BaseModel, Generic[T]):
-    success: bool
-    data: Optional[T] = None
-    message: Optional[str]
+    id: UUID
+    title: str
+    content: str
+    published: bool
+    author: UserResponse
+    created_at: datetime
+    updated_at: datetime
