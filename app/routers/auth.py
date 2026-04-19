@@ -1,13 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from fastapi import APIRouter, Depends
 
-from typing import Literal
-
-from app.dependencies.auth import get_current_user
-from app.schemas import LoginUser, TokenResponse, UserCreate, UserResponse, UserUpdate
-from app.config.database import get_db, User
-from app.services import JWTService
+from app.services import AuthService, UserService
+from app.dependencies.services import get_auth_service, get_user_service
+from app.schemas import UserLogin, TokenResponse, UserCreate, UserResponse, UserUpdate
 
 router = APIRouter(tags=["auth"])
 
@@ -17,15 +12,9 @@ router = APIRouter(tags=["auth"])
 # ---------------------------------------------------------------------------- #
 @router.post("/signup", status_code=201)
 async def signup(
-    fields: UserCreate, session: AsyncSession = Depends(get_db)
+    fields: UserCreate, service: AuthService = Depends(get_auth_service)
 ) -> TokenResponse:
-    new_user = User(**fields.model_dump())
-
-    session.add(new_user)
-    await session.commit()
-    await session.refresh(new_user)
-
-    token = JWTService.issue_token(new_user.id)
+    token = await service.signup(fields)
     return TokenResponse(token=token)
 
 
@@ -33,16 +22,8 @@ async def signup(
 #                            LOGIN USING CREDENTIALS                           #
 # ---------------------------------------------------------------------------- #
 @router.post("/login")
-async def login(fields: LoginUser, session: AsyncSession = Depends(get_db)):
-    result = await session.execute(
-        select(User).where(User.email == fields.email).limit(1)
-    )
-    user = result.scalar_one_or_none()
-
-    if not user or not user.verify_password(fields.password):
-        raise HTTPException(401, "Invalid credentials")
-
-    token = JWTService.issue_token(user.id)
+async def login(fields: UserLogin, service: AuthService = Depends(get_auth_service)):
+    token = await service.login(fields)
     return TokenResponse(token=token)
 
 
@@ -50,16 +31,18 @@ async def login(fields: LoginUser, session: AsyncSession = Depends(get_db)):
 #                                  ISSUE TOKEN                                 #
 # ---------------------------------------------------------------------------- #
 @router.get("/session")
-async def new_token(user: User = Depends(get_current_user)) -> TokenResponse:
-    return TokenResponse(token=JWTService.issue_token(user.id))
+async def new_token(
+    service: UserService = Depends(get_user_service),
+) -> TokenResponse:
+    return TokenResponse(token=service.issue_token())
 
 
 # ---------------------------------------------------------------------------- #
 #                                  GET PROFILE                                 #
 # ---------------------------------------------------------------------------- #
 @router.get("/profile")
-async def get_profile(user: User = Depends(get_current_user)) -> UserResponse:
-    return UserResponse.model_validate(user)
+async def get_profile(service: UserService = Depends(get_user_service)) -> UserResponse:
+    return UserResponse.model_validate(service.user)
 
 
 # ---------------------------------------------------------------------------- #
@@ -68,30 +51,17 @@ async def get_profile(user: User = Depends(get_current_user)) -> UserResponse:
 @router.patch("/profile")
 async def update_profile(
     fields: UserUpdate,
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
+    service: UserService = Depends(get_user_service),
 ) -> UserResponse:
-    update_data = fields.model_dump(exclude_unset=True)
-
-    for key, value in update_data.items():
-        setattr(user, key, value)
-
-    await session.commit()
-    await session.refresh(user)
-
+    user = await service.update_profile(fields)
     return UserResponse.model_validate(user)
 
 
 # ---------------------------------------------------------------------------- #
 #                               DELETE ACCOUNT                                 #
 # ---------------------------------------------------------------------------- #
-@router.delete("/profile")
+@router.delete("/profile", status_code=204)
 async def delete_profile(
-    user: User = Depends(get_current_user),
-    session: AsyncSession = Depends(get_db),
-) -> Literal["Account deleted successfully"]:
-
-    await session.delete(user)
-    await session.commit()
-
-    return "Account deleted successfully"
+    service: UserService = Depends(get_user_service),
+):
+    await service.delete_account()

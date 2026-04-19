@@ -8,9 +8,9 @@ from fastapi import HTTPException
 from uuid import UUID
 from typing import Sequence
 
-from app.repositories import BlogRepo
-from app.config.database import Post
-from app.schemas import BlogCreate, BlogUpdate
+from app.config.database import Post, User
+from app.repositories import BlogRepo, UserRepo
+from app.schemas import BlogCreate, BlogUpdate, UserCreate, UserLogin, UserUpdate
 
 dotenv.load_dotenv()
 
@@ -18,7 +18,7 @@ dotenv.load_dotenv()
 # ---------------------------------------------------------------------------- #
 #                                 JWT Handling                                 #
 # ---------------------------------------------------------------------------- #
-class JWTService:
+class TokenService:
     SECRET_KEY = os.getenv("SECRET_KEY") or "secret-key"
     ALGORITHM = "HS256"
 
@@ -83,3 +83,47 @@ class BlogService:
 
         if not deleted:
             raise HTTPException(status_code=404, detail="Post not found")
+
+
+# ---------------------------------------------------------------------------- #
+#                                 AUTH SERVICE                                 #
+# ---------------------------------------------------------------------------- #
+class AuthService:
+    def __init__(self, repo: UserRepo) -> None:
+        self.repo = repo
+        self.jwt = TokenService
+
+    async def signup(self, fields: UserCreate):
+        exists = await self.repo.get_by_email(fields.email)
+        if exists:
+            raise HTTPException(400, "Email already registered")
+        
+        user = await self.repo.create(fields)
+        return self.jwt.issue_token(user.id)
+
+    async def login(self, fields: UserLogin):
+        user = await self.repo.get_by_email(fields.email)
+
+        if not user or not user.verify_password(fields.password):
+            raise HTTPException(401, "Invalid credentials")
+
+        return self.jwt.issue_token(user.id)
+
+
+# ---------------------------------------------------------------------------- #
+#                                 USER SERVICE                                 #
+# ---------------------------------------------------------------------------- #
+class UserService:
+    def __init__(self, repo: UserRepo, user: User) -> None:
+        self.repo = repo
+        self.user = user
+        self.jwt = TokenService
+
+    def issue_token(self):
+        return self.jwt.issue_token(self.user.id)
+
+    async def update_profile(self, fields: UserUpdate):
+        return await self.repo.update_profile(self.user, fields)
+
+    async def delete_account(self):
+        return await self.repo.delete_profile(self.user)

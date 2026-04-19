@@ -33,7 +33,7 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 
-class LoginUser(BaseModel):
+class UserLogin(BaseModel):
     email: str
     password: str = Field(..., min_length=8, max_length=72)
 

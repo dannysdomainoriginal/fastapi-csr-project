@@ -4,7 +4,7 @@ from sqlalchemy import select, delete
 from uuid import UUID
 
 from app.config.database import get_db, Post, User
-from app.schemas import BlogCreate, BlogUpdate, BlogResponse
+from app.schemas import BlogCreate, BlogUpdate, UserCreate, UserUpdate
 
 
 class BlogRepo:
@@ -65,3 +65,38 @@ class BlogRepo:
 
         await self.db.commit()
         return bool(result.rowcount)  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------- #
+#                                USER REPOSITORY                               #
+# ---------------------------------------------------------------------------- #
+class UserRepo:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create(self, fields: UserCreate) -> User:
+        new_user = User(**fields.model_dump())
+
+        self.db.add(new_user)
+        await self.db.commit()
+        await self.db.refresh(new_user)
+
+        return new_user
+
+    async def get_by_email(self, email: str) -> User | None:
+        result = await self.db.execute(select(User).where(User.email == email).limit(1))
+        return result.scalar_one_or_none()
+
+    async def update_profile(self, user: User, fields: UserUpdate) -> User:
+        update_data = fields.model_dump(exclude_unset=True)
+
+        for key, value in update_data.items():
+            setattr(user, key, value)
+
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    async def delete_profile(self, user: User) -> None:
+        await self.db.delete(user)
+        await self.db.commit()

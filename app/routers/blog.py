@@ -1,9 +1,9 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends
 
-from app.schemas import BlogCreate, BlogUpdate, BlogResponse
-from app.dependencies.blog import get_blog_service
 from app.services import BlogService
+from app.schemas import BlogCreate, BlogUpdate, BlogResponse
+from app.dependencies.services import get_blog_service
 
 router = APIRouter(tags=["blog"])
 
