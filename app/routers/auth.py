@@ -22,7 +22,9 @@ async def signup(
 #                            LOGIN USING CREDENTIALS                           #
 # ---------------------------------------------------------------------------- #
 @router.post("/login")
-async def login(fields: UserLogin, service: AuthService = Depends(get_auth_service)):
+async def login(
+    fields: UserLogin, service: AuthService = Depends(get_auth_service)
+) -> TokenResponse:
     token = await service.login(fields)
     return TokenResponse(token=token)
 

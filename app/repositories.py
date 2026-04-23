@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-
 from uuid import UUID
 
 from app.config.database import Post, User, Issue
@@ -50,7 +49,7 @@ class BlogRepo:
 
     async def get_post_by_id(self, id: UUID):
         result = await self.db.execute(
-            select(Post).where(Post.id == str(id), Post.author_id == self.user_id)
+            select(Post).where(Post.id == id, Post.author_id == self.user_id)
         )
 
         return result.scalar_one_or_none()
@@ -68,7 +67,7 @@ class BlogRepo:
     async def delete_post(self, id: UUID) -> bool:
         result = await self.db.execute(
             delete(Post).where(
-                Post.id == str(id),
+                Post.id == id,
                 Post.author_id == self.user_id,
             )
         )
@@ -148,7 +147,7 @@ class IssueRepo:
 
     async def get_issue_by_id(self, id: UUID):
         result = await self.db.execute(
-            select(Issue).where(Issue.id == str(id), Issue.author_id == self.user_id)
+            select(Issue).where(Issue.id == id, Issue.author_id == self.user_id)
         )
 
         return result.scalar_one_or_none()
@@ -166,7 +165,7 @@ class IssueRepo:
     async def delete_issue(self, id: UUID) -> bool:
         result = await self.db.execute(
             delete(Issue).where(
-                Issue.id == str(id),
+                Issue.id == id,
                 Issue.author_id == self.user_id,
             )
         )

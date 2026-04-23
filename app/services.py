@@ -1,14 +1,11 @@
-import os
-import dotenv
-
 from datetime import datetime, timezone, timedelta
 from jose import jwt, JWTError
 from fastapi import HTTPException
 
 from uuid import UUID
-from typing import Sequence
+from app.config.settings import settings
 
-from app.config.database import Post, User
+from app.config.database import User
 from app.repositories import BlogRepo, UserRepo, IssueRepo
 from app.schemas import (
     BlogCreate,
@@ -20,28 +17,26 @@ from app.schemas import (
     IssueUpdate,
 )
 
-dotenv.load_dotenv()
-
 
 # ---------------------------------------------------------------------------- #
 #                                 JWT Handling                                 #
 # ---------------------------------------------------------------------------- #
 class TokenService:
-    SECRET_KEY = os.getenv("SECRET_KEY") or "secret-key"
+    SECRET_KEY = settings.secret_key
     ALGORITHM = "HS256"
 
     @classmethod
     def issue_token(
-        cls, user_id: str, expires_delta: timedelta = timedelta(days=7)
+        cls, user_id: UUID, expires_delta: timedelta = timedelta(days=7)
     ) -> str:
         payload = {
-            "sub": user_id,
+            "sub": str(user_id),
             "exp": datetime.now(timezone.utc) + expires_delta,
         }
         return jwt.encode(payload, cls.SECRET_KEY, algorithm=cls.ALGORITHM)
 
     @classmethod
-    def verify_token(cls, token: str):
+    def verify_token(cls, token: str) -> UUID:
         try:
             payload = jwt.decode(token, cls.SECRET_KEY, algorithms=[cls.ALGORITHM])
             user_id: str | None = payload.get("sub")
@@ -49,7 +44,7 @@ class TokenService:
             if user_id is None:
                 raise HTTPException(status_code=401, detail="Invalid token")
 
-            return user_id
+            return UUID(user_id)
         except JWTError:
             raise HTTPException(
                 status_code=401,

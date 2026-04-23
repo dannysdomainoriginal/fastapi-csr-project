@@ -1,18 +1,18 @@
 from collections.abc import AsyncGenerator
 from datetime import datetime
-from uuid import uuid4
+import uuid
 
 from sqlalchemy import String, Text, DateTime, ForeignKey, Boolean, event, func, Enum
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, relationship
-
-from sqlalchemy.engine.interfaces import DBAPIConnection
-from sqlalchemy.pool.base import _ConnectionRecord
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.config.security import hash_password, verify_password
+from app.config.settings import settings
 
-DATABASE_URL = "sqlite+aiosqlite:///./app_database.db"
+DATABASE_URL = settings.database_url
+print(f"Using database URL: {DATABASE_URL}")
 
 
 # ---------------------------------------------------------------------------- #
@@ -26,8 +26,8 @@ class Post(Base):
     __tablename__ = "posts"
 
     # Using Mapped[] provides perfect type-checking
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid4())
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -50,8 +50,8 @@ class Post(Base):
 class Issue(Base):
     __tablename__ = "issues"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid4())
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -76,8 +76,8 @@ class Issue(Base):
 class User(Base):
     __tablename__ = "users"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True, default=lambda: str(uuid4())
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
 
     name: Mapped[str] = mapped_column(String, nullable=False)
@@ -109,18 +109,14 @@ class User(Base):
         return verify_password(plain_password, self.password_hash)
 
 
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_size=10,
+    max_overflow=20,
+    pool_timeout=30,
+)
+
 async_session = async_sessionmaker(engine, expire_on_commit=False)
-
-
-# ---------------------------------------------------------------------------- #
-#                          SQLITE CASCADE ENFORCEMENT                          #
-# ---------------------------------------------------------------------------- #
-@event.listens_for(engine.sync_engine, "connect")
-def set_sqlite_pragma(dbapi_connection: DBAPIConnection, _crecord: _ConnectionRecord):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
 
 
 # ---------------------------------------------------------------------------- #

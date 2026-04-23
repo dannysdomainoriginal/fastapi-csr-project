@@ -5,12 +5,15 @@ description = "A 4 hour tutorial for FastAPI"
 requires-python = ">=3.13"
 dependencies = [
   "aiosqlite>=0.21.0",
+  "alembic>=1.18.4",
   "bcrypt==4.0.1",
   "black>=25.12.0",
   "fastapi>=0.124.2",
   "fastapi-logging-middleware>=0.1.2",
   "imagekitio>=4.2.0",
   "passlib[bcrypt]>=1.7.4",
+  "psycopg[binary]>=3.3.3",
+  "pydantic-settings>=2.14.0",
   "python-dotenv>=1.2.1",
   "python-jose>=3.5.0",
   "sqlalchemy>=2.0.49",
