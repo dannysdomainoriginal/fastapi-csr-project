@@ -1,6 +1,7 @@
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ProcessPoolExecutor
 
+from itertools import chain
 from jose import jwt, JWTError
 from fastapi import HTTPException
 from asyncio import to_thread, get_running_loop, gather
@@ -96,15 +97,35 @@ class BlogService:
         return content.lower().count(q.lower())
 
     # ---------------------------------------------------------------------------- #
+    #                            SEARCH POSTS USING LOOP                           #
+    # ---------------------------------------------------------------------------- #
+    async def search_posts_using_loop(self, query: str, posts):
+        results = []
+        for post in posts:
+            score = self._score(query, post.content)
+            results.append((score, post))
+
+        results.sort(reverse=True, key=lambda x: x[0])
+        return [post for _, post in results]
+
+    @staticmethod
+    def _score_batch(q: str, contents: list[str]) -> list[int]:
+        return [c.lower().count(q.lower()) for c in contents]
+
+    # ---------------------------------------------------------------------------- #
     #                           SEARCH POSTS USING THREAD                          #
     # ---------------------------------------------------------------------------- #
     async def search_posts_using_thread(self, query: str, posts):
-        posts = await self.repo.get_all_posts()
+        CHUNK_SIZE = 500
+        chunks = [posts[i : i + CHUNK_SIZE] for i in range(0, len(posts), CHUNK_SIZE)]
 
-        results = []
-        for post in posts:
-            score = await to_thread(self._score, query, post.content)
-            results.append((score, post))
+        async def _run_batch(chunk):
+            contents = [p.content for p in chunk]
+            scores = await to_thread(self._score_batch, query, contents)
+            return zip(scores, chunk)
+
+        batched_results = await gather(*(_run_batch(c) for c in chunks))
+        results = list(chain.from_iterable(batched_results))
 
         results.sort(reverse=True, key=lambda x: x[0])
         return [post for _, post in results]
@@ -113,41 +134,10 @@ class BlogService:
     #                            SEARCH POSTS USING POOL                           #
     # ---------------------------------------------------------------------------- #
     async def search_posts_using_pool(self, query: str, posts):
-        posts = await self.repo.get_all_posts()
+        CHUNK_SIZE = 500
+        chunks = [posts[i : i + CHUNK_SIZE] for i in range(0, len(posts), CHUNK_SIZE)]
+
         loop = get_running_loop()
-
-        # Prepare lightweight payloads (IMPORTANT for multiprocessing)
-        tasks: list[tuple[str, str]] = [(query, post.content) for post in posts]
-
-        # Run CPU work in process pool
-        futures = [
-            loop.run_in_executor(self.pool, self._score, q, content)
-            for q, content in tasks
-        ]
-        scores = await gather(*futures)
-
-        # Combine results safely
-        results = list(zip(scores, posts))
-        results.sort(key=lambda x: x[0], reverse=True)
-        return [post for _, post in results]
-
-    @staticmethod
-    def _score_batch(q: str, contents: list[str]) -> list[int]:
-        return [c.lower().count(q.lower()) for c in contents]
-
-    # ---------------------------------------------------------------------------- #
-    #                            SEARCH POSTS IN CHUNKS                            #
-    # ---------------------------------------------------------------------------- #
-    async def search_posts_in_chunks(self, query: str, posts):
-        loop = get_running_loop()
-
-        def _chunk(data, size: int):
-            for i in range(0, len(data), size):
-                yield data[i : i + size]
-
-        CHUNK_SIZE = 100
-        chunks = list(_chunk(posts, CHUNK_SIZE))
-
         futures = []
         for chunk in chunks:
             contents = [post.content for post in chunk]
@@ -173,12 +163,12 @@ class BlogService:
         n = len(posts)
 
         match n:
-            case n if n <= 200:
-                return await self.search_posts_using_thread(query, posts=posts)
-            case n if n <= 5_000:
-                return await self.search_posts_using_pool(query, posts=posts)
+            case n if n <= 800:
+                return await self.search_posts_using_loop(query, posts)
+            case n if n <= 8_000:
+                return await self.search_posts_using_thread(query, posts)
             case _:
-                return await self.search_posts_in_chunks(query, posts=posts)
+                return await self.search_posts_using_pool(query, posts)
 
 
 # ---------------------------------------------------------------------------- #
