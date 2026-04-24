@@ -67,3 +67,14 @@ async def delete_post_by_id(
     service: BlogService = Depends(get_blog_service),
 ) -> None:
     await service.delete_post_or_404(id)
+
+
+# ---------------------------------------------------------------------------- #
+#                               SEARCH ALL POSTS                               #
+# ---------------------------------------------------------------------------- #
+@router.get("/search")
+async def search_posts(
+    query: str, service: BlogService = Depends(get_blog_service)
+) -> list[BlogResponse]:
+    posts = await service.search_posts(query)
+    return list(map(BlogResponse.model_validate, posts))

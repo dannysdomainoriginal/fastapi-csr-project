@@ -17,7 +17,7 @@ from app.schemas import (
 #                                BLOG REPOSITORY                               #
 # ---------------------------------------------------------------------------- #
 class BlogRepo:
-    def __init__(self, db: AsyncSession, user_id: str):
+    def __init__(self, db: AsyncSession, user_id: UUID):
         self.db = db
         self.user_id = user_id
 
@@ -115,7 +115,7 @@ class UserRepo:
 #                              ISSUES REPOSITORIES                             #
 # ---------------------------------------------------------------------------- #
 class IssueRepo:
-    def __init__(self, db: AsyncSession, user_id: str):
+    def __init__(self, db: AsyncSession, user_id: UUID):
         self.db = db
         self.user_id = user_id
 
